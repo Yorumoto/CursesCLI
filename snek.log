@@ -1,8 +1,0 @@
-DEBUG -- Hello!
-DEBUG -- 0: [15, 58, '                  Snake']
-DEBUG -- 2: [17, 58, '>> Play']
-DEBUG -- 3: [18, 58, '   Exit']
-DEBUG -- 0: [15, 58, '          Game Over | Score: 0']
-DEBUG -- 2: [17, 58, '>> Resume']
-DEBUG -- 3: [18, 58, '   Restart']
-DEBUG -- 4: [19, 58, '   Back to Menu']
