@@ -2,7 +2,6 @@ import logging
 import curses
 import time
 from random import randint
-from enum import Enum
 from curses import textpad
 logging.basicConfig(filename="snek.log", filemode="w+", format="%(levelname)s -- %(message)s", level=logging.DEBUG)
 
