@@ -91,7 +91,9 @@ class SnakeHead:
 
 class Food(SnakeHead):
     def __init__(self, snake):
-        area_height, area_width = snake.height, snake.width
+        self.eaten = False
+
+        area_height, area_width = snake.height - 1, snake.width - 1
         
         x = 0
         y = 0
@@ -99,7 +101,7 @@ class Food(SnakeHead):
         while True:
             x = randint(0, area_width)
             y = randint(0, area_height)
-
+            
             con = False
             
             for body in snake.body:
@@ -132,15 +134,15 @@ class Snake:
         curses.KEY_DOWN : (3, 2),    
     }
 
-    def __init__(self, y, x, width, height, foods):
+    def __init__(self, y, x, width, height, game):
         self.ox = x
         self.oy = y
+        self.game = game
         self.width = width
         self.height = height
         self.reset()
         self.move_timer = 0.25
         self.block = 0
-        self.foods = foods
 
     def mod_x(self, x):
         return x % self.width
@@ -167,10 +169,17 @@ class Snake:
             if body == self.head:
                 continue
             
-            bumped = self.head.x == body.x and self.head.y == body.y 
-
-            if bumped:
-                break
+            if self.head.x == body.x and self.head.y == body.y:
+                self.game.game_over = True
+                return
+        
+        for food in self.game.foods:
+            if self.head.x != food.x or self.head.y != food.y:
+                continue
+            food.eaten = True
+            self.game.score += 1
+            self.grow()
+            self.game.food_timer = 0
 
         if inp in self.input_detects:
             new_h, new_b = self.input_detects[inp]
@@ -179,13 +188,11 @@ class Snake:
             if new_h != self.block:
                 self.block = new_b
                 self.head.d = new_h
-        
-        return False, bumped
     
     def grow(self):
         last = self.body[-1]
         ax, ay = self.vectors[self.opposite_vectors[last.d]]
-        self.body.append(SnakeHead(self.mod_x(last.x + ax), self.mod_y(last.y + ay)))
+        self.body.append(SnakeHead(self.mod_y(last.y + ay), self.mod_x(last.x + ax)))
 
     def reset(self):
         self.body = [SnakeHead(self.oy, self.ox+i) for i in range(6)]
@@ -228,40 +235,49 @@ def get_cen(src):
     # logging.debug(''.join(src.getmaxyx()))
     return [x//2 for x in list(src.getmaxyx())]
 
-def game(src):
-    score = 0
-    game_over = False
-    foods = []
-    food_timer = 0
+class Game:
+    def __init__(self):
+        self.foods = []
+        self.reset()
+
+    def reset(self):
+        self.game_over = False
+        self.food_timer = 0
+        self.score = 0
+        self.foods.clear()
+
+def gamefunc(src):
+    game = Game()
     
     curses.init_pair(2, curses.COLOR_WHITE, curses.COLOR_RED)
     food_color = curses.color_pair(2)
 
     def game_render(self, y, x):
-        self.src.addstr(y-2, x, f"Score: {score}") 
+        self.src.addstr(y-2, x, f"Score: {game.score}") 
 
         for point in snake.body:
             # logging.debug(f'{point.x}, {point.y}')
             self.src.addstr(y+point.y+1, x+point.x+1, ' ', curses.A_REVERSE)
         
-        for food in foods:
+        for food in game.foods:
             self.src.addstr(y+food.y+1, x+food.x+1, ' ', food_color)
 
     game_frame = Frame(src, width=80, height=30).set_rendering_method(game_render)
-    snake = Snake(y=game_frame.height//2, x=game_frame.width//2, width=game_frame.width-1, height=game_frame.height-1, foods=foods)
+    snake = Snake(y=game_frame.height//2, x=game_frame.width//2, width=game_frame.width-1, height=game_frame.height-1, game=game)
     src.nodelay(True)
     # last_time = time.time()
 
     def reset_game():
         global score, food_timer, foods
-        score = 0
         snake.reset()
+        game.reset()
         src.nodelay(True)
-        food_timer = 100
+        
         # flushed
-        foods = [SnakeHead(randint(0, snake.width), randint(0, snake.height))]
+        
 
     reset_game()
+    
 
     while True:
         # current_time = time.time()
@@ -270,8 +286,10 @@ def game(src):
         
         # polling
         
-        if game_over:
-            sel = select_items(src, f"Game Over | Score: {score}", [[0, 'Resume'], [1, 'Restart'], [2, 'Back to Menu']], render=sel_ren)
+        if game.game_over:
+            src.nodelay(False)
+            
+            sel = select_items(src, f"Game Over | Score: {game.score}", [[1, 'Restart'], [2, 'Back to Menu']], render=sel_ren)
             
             if sel == 1:
                 reset_game()
@@ -294,12 +312,15 @@ def game(src):
             src.nodelay(True)
         
         # update
-        food_eaten, game_over = snake.update(inp)
-       
-        if food_eaten:
-            score += 1
-            snake.grow()
+        game.food_timer -= 1
 
+        if game.food_timer <= 0:
+            game.foods.append(Food(snake))
+            game.food_timer = randint(5, 90)
+        
+        game.foods = [x for x in game.foods if not x.eaten]
+
+        snake.update(inp)
         # render
         src.clear()
 
@@ -308,13 +329,13 @@ def game(src):
             game_frame.render()
             # src.addstr('cmon')
         except curses.error:
-            src.addstr("Terminal too flat/small")
+            src.addstr("Game Rendering cannot fit in this terminal")
 
         src.refresh()
         time.sleep(0.1)
 
 def menu(src): 
-    select_items(src, "Snake", [[game, 'Play'], [lambda _: exit(0), 'Exit']], render=sel_ren)(src)
+    select_items(src, "Snake", [[gamefunc, 'Play'], [lambda _: exit(0), 'Exit']], render=sel_ren)(src)
 
 def main(src):
     curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_WHITE)
@@ -334,13 +355,15 @@ def main(src):
 
             src.attroff(color_pair)
         except curses.error:
-            src.addstr('Terminal too flat/small')    
+            src.addstr('Game Rendering cannot fit in this terminal')    
         src.refresh()
     
     logging.debug('Hello!')
     # src.nodelay(True)
     src.clear()
-    menu(src)
+    
+    while True:
+        menu(src)
 
 src = curses.initscr()
 curses.noecho()
