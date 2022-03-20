@@ -178,7 +178,7 @@ class Snake:
             food.eaten = True
             self.game.score += 1
             self.grow()
-            self.game.food_timer = 0
+            # self.game.food_timer = 0
 
         if inp in self.input_detects:
             new_h, new_b = self.input_detects[inp]
@@ -331,7 +331,7 @@ def gamefunc(src):
             src.addstr("Game Rendering cannot fit in this terminal")
 
         src.refresh()
-        time.sleep(0.1)
+        src.timeout(100)
 
 def menu(src): 
     select_items(src, "Snake", [[gamefunc, 'Play'], [lambda _: exit(0), 'Exit']], render=sel_ren)(src)
